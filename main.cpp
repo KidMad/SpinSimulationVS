@@ -17,7 +17,7 @@ using std::string;
 
 using namespace tools;
 
-constexpr char* OPERATORS_PATH = "../../../operators";
+constexpr char* OPERATORS_PATH = "../../../operators/";
 constexpr char* DATA_OUTPUT_PATH = "E:\\Desktop\\Edu\\University\\3 Anno\\Tesi\\AnalisiDati\\data\\";
 
 int main(){
@@ -68,20 +68,23 @@ int main(){
     cout << "Initialized density matrix" << endl;
 
     /**We decompose the hamiltonian to build the time evolution operators through exponentiation*/
-    SelfAdjointEigenSolver<MatrixXcd> es(*hamiltonian);
+    SelfAdjointEigenSolver<MatrixXd> es(*hamiltonian);
     cout << "Decomposed hamiltonian" << endl;
 
     /**H = U*D*U_inv*/
     /*We are using the order given by the algorithm's solution, it doesn't really matter.**/
-    auto U = new MatrixXcd(hamiltonian->rows(), hamiltonian->cols());
+    auto U = new MatrixXd(hamiltonian->rows(), hamiltonian->cols());
     (*U) << es.eigenvectors();
+
     /*We exploit the DiagonalMatrix class to avoid useless calculations.**/
-    auto D = new Eigen::DiagonalMatrix<std::complex<double>, Eigen::Dynamic>(hamiltonian->rows());
+    auto D = new Eigen::DiagonalMatrix<double, Eigen::Dynamic>(hamiltonian->rows());
     D->diagonal() << es.eigenvalues();
 
     /*We explicitly calculate the eigenvectors' matrix inverse.**/
-    auto U_inv = new MatrixXcd(hamiltonian->rows(), hamiltonian->cols());
-    *U_inv << U->inverse();
+    auto U_inv = new MatrixXd(hamiltonian->rows(), hamiltonian->cols());
+    *U_inv << U->transpose();
+
+    cout << endl;
 
     /**Time evolution operator exp(-iHdt)*/
     auto exp_s = time_evolution_operator(dt, D, U, U_inv);
@@ -131,16 +134,16 @@ int main(){
     cout << "Calculated measurements in " << static_cast<double>(us.count()) / 1000.0 << "ms" << endl;
     
     
-    //Eigen::JacobiSVD <MatrixXd> svd(measurements, Eigen::ComputeThinU | Eigen::ComputeThinV);
-    //cout << "Generated measurements' matrix SVD" << endl;
-    //VectorXd weights = svd.solve(outputs);
+    Eigen::JacobiSVD <MatrixXd> svd(measurements, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    cout << "Generated measurements' matrix SVD" << endl;
+    VectorXd weights = svd.solve(outputs);
 
     //cout << "Calculated weights" << endl;
 
-    clear_data_folder();
-    exportMatrixToCSV(&measurements, "measurements");
-    exportVectorToCSV(&inputs, "inputs");
-    exportVectorToCSV(&outputs, "outputs");
+    //clear_data_folder();
+    //exportMatrixToCSV(&measurements, "measurements");
+    //exportVectorToCSV(&inputs, "inputs");
+    //exportVectorToCSV(&outputs, "outputs");
 
     
     return 0;

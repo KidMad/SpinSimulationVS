@@ -9,12 +9,14 @@
 using Eigen::MatrixXcd;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
+using Eigen::Matrix;
 using std::complex;
 using std::floor;
 using std::cout;
 using std::endl;
 
-MatrixXcd* tools::kronecker_product(const std::vector<MatrixXcd>& matrices) {
+template<typename T>
+Matrix<T, Eigen::Dynamic, Eigen::Dynamic>* tools::kronecker_product(const std::vector<Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>& matrices) {
 
     long long int rows_dim = 1;
     long long int cols_dim = 1;
@@ -25,13 +27,13 @@ MatrixXcd* tools::kronecker_product(const std::vector<MatrixXcd>& matrices) {
         cols_dim *= (*(matrices.begin() + i)).cols();
     }
 
-    auto result = new MatrixXcd(rows_dim, cols_dim);
+    auto result = new Matrix<O, Eigen::Dynamic, Eigen::Dynamic>(rows_dim, cols_dim);
 
 #pragma omp parallel for default(none) shared(cout, rows_dim, cols_dim, matrices, result)
     for (int i = 0; i < rows_dim; ++i) {
         for (int j = 0; j < cols_dim; ++j) {
             /**It starts by calculating the first factor from the last matrix*/
-            complex<double> value = (*(matrices.end() - 1))(i % (*(matrices.end() - 1)).rows(), j % (*(matrices.end() - 1)).cols());
+            T value = (*(matrices.end() - 1))(i % (*(matrices.end() - 1)).rows(), j % (*(matrices.end() - 1)).cols());
 
             /**We start from i and j*/
             long long prev_row_index_division = i;
@@ -42,7 +44,7 @@ MatrixXcd* tools::kronecker_product(const std::vector<MatrixXcd>& matrices) {
 
             /**We go from the N - 1 matrix to the 2 matrix*/
             for (int l = 1; l < matrices.size() - 1; ++l) {
-                const MatrixXcd& m = *(matrices.end() - 1 - l);
+                const Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& m = *(matrices.end() - 1 - l);
 
                 auto new_row_index_division = static_cast<long long>(floor(prev_row_index_division / prev_matrix_rows_dim));
                 auto new_col_index_division = static_cast<long long>(floor(prev_col_index_division / prev_matrix_cols_dim));
@@ -65,7 +67,9 @@ MatrixXcd* tools::kronecker_product(const std::vector<MatrixXcd>& matrices) {
     }
     return result;
 }
-MatrixXcd* tools::kronecker_product(const std::initializer_list<MatrixXcd*> matrices) {
+
+template<typename T>
+Matrix<T, Eigen::Dynamic, Eigen::Dynamic>* tools::kronecker_product(const std::initializer_list<Matrix<T, Eigen::Dynamic, Eigen::Dynamic>*> matrices) {
 
     long long int rows_dim = 1;
     long long int cols_dim = 1;
@@ -75,7 +79,7 @@ MatrixXcd* tools::kronecker_product(const std::initializer_list<MatrixXcd*> matr
         cols_dim *= (*(matrices.begin() + i))->cols();
     }
 
-    auto result = new MatrixXcd(rows_dim, cols_dim);
+    auto result = new Matrix<T, Eigen::Dynamic, Eigen::Dynamic>(rows_dim, cols_dim);
 
 #pragma omp parallel for default(none) shared(cout, rows_dim, cols_dim, matrices, result)
     for (int i = 0; i < rows_dim; ++i) {
@@ -83,7 +87,7 @@ MatrixXcd* tools::kronecker_product(const std::initializer_list<MatrixXcd*> matr
         for (int j = 0; j < cols_dim; ++j) {
 
             /**It starts by calculating the first factor from the last matrix*/
-            complex<double> value = (**(matrices.end() - 1))(i % (**(matrices.end() - 1)).rows(), j % (**(matrices.end() - 1)).cols());
+            T value = (**(matrices.end() - 1))(i % (**(matrices.end() - 1)).rows(), j % (**(matrices.end() - 1)).cols());
 
             /**We start from i and j*/
             long long prev_row_index_division = i;
@@ -94,7 +98,7 @@ MatrixXcd* tools::kronecker_product(const std::initializer_list<MatrixXcd*> matr
 
             /**We go from the N - 1 matrix to the 2 matrix*/
             for (int l = 1; l < matrices.size() - 1; ++l) {
-                const MatrixXcd& m = **(matrices.end() - 1 - l);
+                const Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& m = **(matrices.end() - 1 - l);
 
                 auto new_row_index_division = static_cast<long long>(floor(prev_row_index_division / prev_matrix_rows_dim));
                 auto new_col_index_division = static_cast<long long>(floor(prev_col_index_division / prev_matrix_cols_dim));
@@ -119,8 +123,8 @@ MatrixXcd* tools::kronecker_product(const std::initializer_list<MatrixXcd*> matr
 }
 
 /**BE CAREFUL: nth starts from 0*/
-MatrixXcd* tools::sigmaX(int nth, const int dim) {
-    auto x = MatrixXcd(2, 2);
+MatrixXd* tools::sigmaX(int nth, const int dim) {
+    auto x = MatrixXd(2, 2); 
     x.setZero();
     x(0, 1) = 1;
     x(1, 0) = 1;
@@ -129,34 +133,34 @@ MatrixXcd* tools::sigmaX(int nth, const int dim) {
     int dim_2 = static_cast<int>(pow(2, dim - nth - 1));
 
     auto x_nth = tools::kronecker_product({
-        &MatrixXcd(dim_1, dim_1).setIdentity(),
+        &MatrixXd(dim_1, dim_1).setIdentity(),
         &x,
-        &MatrixXcd(dim_2, dim_2).setIdentity()
+        &MatrixXd(dim_2, dim_2).setIdentity()
         });
 
     return x_nth;
 }
 /**BE CAREFUL: nth starts from 0*/
-MatrixXcd* tools::sigmaY(int nth, const int dim) {
-    auto y = MatrixXcd(2, 2);
+MatrixXd* tools::sigmaY(int nth, const int dim) {
+    auto y = MatrixXd(2, 2);
     y.setZero();
-    y(0, 1) = complex<double>(0, -1);
-    y(1, 0) = complex<double>(0, 1);
+    y(0, 1) = -1;
+    y(1, 0) = 1;
 
     int dim_1 = static_cast<int>(pow(2, nth));
     int dim_2 = static_cast<int>(pow(2, dim - nth - 1));
 
     auto y_nth = tools::kronecker_product({
-        &MatrixXcd(dim_1, dim_1).setIdentity(),
+        &MatrixXd(dim_1, dim_1).setIdentity(),
         &y,
-        &MatrixXcd(dim_2, dim_2).setIdentity()
+        &MatrixXd(dim_2, dim_2).setIdentity()
         });
 
     return y_nth;
 }
 /**BE CAREFUL: nth starts from 0*/
-MatrixXcd* tools::sigmaZ(int nth, const int dim) {
-    auto z = MatrixXcd(2, 2);
+MatrixXd* tools::sigmaZ(int nth, const int dim) {
+    auto z = MatrixXd(2, 2);
     z.setZero();
     z(0, 0) = 1;
     z(1, 1) = -1;
@@ -165,19 +169,19 @@ MatrixXcd* tools::sigmaZ(int nth, const int dim) {
     int dim_2 = static_cast<int>(pow(2, dim - nth - 1));
 
     auto z_nth = tools::kronecker_product({
-        &MatrixXcd(dim_1, dim_1).setIdentity(),
+        &MatrixXd(dim_1, dim_1).setIdentity(),
         &z,
-        &MatrixXcd(dim_2, dim_2).setIdentity()
+        &MatrixXd(dim_2, dim_2).setIdentity()
         });
 
     return z_nth;
 }
 
-MatrixXcd* tools::ising_hamiltonian(const double H, const double J, const int dim) {
+MatrixXd* tools::ising_hamiltonian(const double H, const double J, const int dim) {
     auto on_site_parameter = new VectorXd(dim);
     on_site_parameter->setRandom();
 
-    auto ham_on_site = new MatrixXcd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
+    auto ham_on_site = new MatrixXd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
     ham_on_site->setZero();
 
     for (int i = 0; i < dim; ++i) {
@@ -189,7 +193,7 @@ MatrixXcd* tools::ising_hamiltonian(const double H, const double J, const int di
     auto interaction_coupling = new MatrixXd(dim, dim);
     interaction_coupling->setRandom();
 
-    auto ham_interaction = new MatrixXcd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
+    auto ham_interaction = new MatrixXd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
     ham_interaction->setZero();
 
     for (int i = 0; i < dim; ++i) {
@@ -210,10 +214,10 @@ MatrixXcd* tools::ising_hamiltonian(const double H, const double J, const int di
 }
 
 MatrixXcd* tools::reset(double signal_k, MatrixXcd* rho) {
-    Eigen::Vector2cd sig_state(2);
+    Eigen::Vector2d sig_state(2);
     sig_state << sqrt(1 - signal_k), sqrt(signal_k);
 
-    MatrixXcd rho1 = sig_state * sig_state.transpose().conjugate();
+    MatrixXcd rho1 = sig_state * sig_state.transpose();
 
     auto traced = new MatrixXcd(rho->rows() / 2, rho->cols() / 2);
 
@@ -234,7 +238,7 @@ MatrixXcd* tools::reset(double signal_k, MatrixXcd* rho) {
     return result;
 }
 
-MatrixXcd* tools::time_evolution_operator(const double dt, Eigen::DiagonalMatrix<complex<double>, Eigen::Dynamic>* D, MatrixXcd* U, MatrixXcd* U_inv) {
+MatrixXcd* tools::time_evolution_operator(const double dt, Eigen::DiagonalMatrix<double, Eigen::Dynamic>* D, MatrixXd* U, MatrixXd* U_inv) {
     auto op = new MatrixXcd(U->rows(), U->cols());
     auto phase_factors = new Eigen::DiagonalMatrix<complex<double>, Eigen::Dynamic>(D->rows());
 
@@ -250,7 +254,7 @@ MatrixXcd* tools::time_evolution_operator(const double dt, Eigen::DiagonalMatrix
     return op;
 }
 
-void tools::average_single(MatrixXcd* rho, std::vector<MatrixXcd*> all, MatrixXd& output, int sample) {
+void tools::average_single(MatrixXcd* rho, std::vector<MatrixXd*> all, MatrixXd& output, int sample) {
     /*Row -> qubit, Cols -> average of j-th operator**/
     int dim = static_cast<int>(round(std::log2(rho->rows())));
 
@@ -266,7 +270,16 @@ void tools::average_single(MatrixXcd* rho, std::vector<MatrixXcd*> all, MatrixXd
         delete sy;
         delete sz;
     }*/
-    for (int i = 0; i < 3*dim; ++i) {
+    //X
+    for (int i = 0; i < dim; ++i) {
+        output(sample, i) = (*rho * *all[i]).trace().real();
+    }
+    //Y
+    for (int i = dim; i < 2*dim; ++i) {
+        output(sample, i) = (complex<double>(0, 1) * *rho * *all[i]).trace().real();
+    }
+    //Z
+    for (int i = 2*dim; i < 3*dim; ++i) {
         output(sample, i) = (*rho * *all[i]).trace().real();
     }
 }
@@ -307,7 +320,7 @@ void tools::average_single(MatrixXcd* rho, std::vector<MatrixXcd*> all, MatrixXd
 //    return meas;
 //}
 
-void tools::average_double(MatrixXcd* rho, std::vector<MatrixXcd*> all, MatrixXd& output, int sample) {
+void tools::average_double(MatrixXcd* rho, std::vector<MatrixXd*> all, MatrixXd& output, int sample) {
     int dim = static_cast<int>(round(std::log2(rho->rows())));
     //auto meas = new VectorXd(3 * dim * (dim - 1) / 2);
 
@@ -356,9 +369,9 @@ void tools::average_double(MatrixXcd* rho, std::vector<MatrixXcd*> all, MatrixXd
     for (int i = 0; i < dim; ++i) {
         for (int j = i + 1; j < dim; ++j) {
             //nb: counter++ first pass the value then increment.
-            output(sample, counter++) = (*rho * *all[3 * i] * *all[3 * j]).trace().real();
-            output(sample, counter++) = (*rho * *all[3 * i + 1] * *all[3 * j + 1]).trace().real();
-            output(sample, counter++) = (*rho * *all[3 * i + 2] * *all[3 * j + 2]).trace().real();
+            output(sample, counter++) = (*rho * *all[i] * *all[j]).trace().real();
+            output(sample, counter++) = (-1 * *rho * *all[i + dim] * *all[j + dim]).trace().real();// x-1 since we are using the real sigmaY
+            output(sample, counter++) = (*rho * *all[i + 2*dim] * *all[j + 2*dim]).trace().real();
         }
     }
 }
@@ -422,6 +435,11 @@ void tools::set_data_output_path(const std::string& new_path) {
     tools::data_output_path = new_path;
 }
 
+enum tools::Pauli {
+    X = 0,
+    Y = 1,
+    Z = 2,
+};
 void tools::generate_mb_sigma_operators(const int dim, const std::string& path) {
 
     if (!std::filesystem::exists(path)) {
@@ -434,12 +452,13 @@ void tools::generate_mb_sigma_operators(const int dim, const std::string& path) 
     }
 
     std::ofstream output;
+    std::ostringstream full_path;
+    cout << "x ";
     for (int i = 0; i < dim; ++i) {
         cout << i;
         auto sigmaX_i = sigmaX(i, dim);
         int size = sigmaX_i->rows();
-        std::ostringstream full_path;
-        full_path << path << "/sigmaX_" << i << ".bin";
+        full_path << path << Pauli::X << "_sigma_" << i << ".bin";
         output.open(full_path.str(), std::ios::binary);
 
         /**Saves the size of the matrix. (Since it's a square matrix it's needed just one dimension)*/
@@ -456,16 +475,20 @@ void tools::generate_mb_sigma_operators(const int dim, const std::string& path) 
         delete sigmaX_i;
         full_path.str("");
         full_path.clear();
-        cout << " x";
-
-        full_path << path << "/sigmaY_" << i << ".bin";
+    }
+    cout << endl;
+    cout << "y ";
+    for (int i = 0; i < dim; ++i) {
+        cout << i;
         auto sigmaY_i = sigmaY(i, dim);
-        size = sigmaY_i->rows();
+        int size = sigmaY_i->rows();
+        full_path << path << Pauli::Y << "_sigma_" << i << ".bin";
         output.open(full_path.str(), std::ios::binary);
         output.write(
             reinterpret_cast<const char*>(&size),
             sizeof(size)
         );
+
         output.write(
             reinterpret_cast<const char*>(sigmaY_i->data()),
             sizeof(sigmaY_i->data()[0]) * size * size
@@ -474,11 +497,14 @@ void tools::generate_mb_sigma_operators(const int dim, const std::string& path) 
         delete sigmaY_i;
         full_path.str("");
         full_path.clear();
-        cout << " y";
-
-        full_path << path << "/sigmaZ_" << i << ".bin";
+    }
+    cout << endl;
+    cout << "z ";
+    for (int i = 0; i < dim; ++i) {
+        cout << i;
         auto sigmaZ_i = sigmaZ(i, dim);
-        size = sigmaZ_i->rows();
+        int size = sigmaZ_i->rows();
+        full_path << path << Pauli::Z << "_sigma_" << i << ".bin";
         output.open(full_path.str(), std::ios::binary);
         output.write(
             reinterpret_cast<const char*>(&size),
@@ -492,41 +518,50 @@ void tools::generate_mb_sigma_operators(const int dim, const std::string& path) 
         delete sigmaZ_i;
         full_path.str("");
         full_path.clear();
-        cout << " z" << endl;
-
     }
+    cout << endl;
 }
 
-MatrixXcd* tools::load_sigma(int nth_qubit, const std::string& which, const std::string& path) {
+
+MatrixXd* tools::load_sigma(int nth_qubit, const Pauli which, const std::string& path) {
     std::ostringstream full_path;
     
-    std::string which_uppercase = which;
+    /*std::string which_uppercase = which;
     for (auto& c : which_uppercase) {
         c = toupper(c);
-    }
-    full_path << path << "/sigma" << which_uppercase << "_" << nth_qubit << ".bin";
+    }*/
+    full_path << path << which << "_sigma_" << nth_qubit << ".bin";
     std::ifstream input(full_path.str(), std::ios::binary);
     int size;
     input.read(
         reinterpret_cast<char*>(&size),
         sizeof(size)
     );
-    auto sigma = new MatrixXcd(size, size);
+    auto sigma = new MatrixXd(size, size);
     input.read(
         reinterpret_cast<char*>(sigma->data()),
-        sizeof(std::complex<double>) * size * size //rows * columns number of elements
+        sizeof(double) * size * size //rows * columns number of elements
     );
     input.close();
     return sigma;
 }
 
 /**0x 0y 0z 1x 1y 1z ...*/
-std::vector<MatrixXcd*> tools::load_all_sigma(const int dim, const std::string& path) {
-    std::vector<MatrixXcd*> all (dim*3);
-    for (int i = 0, j = 0; i < 3*dim; i+=3, ++j) {
+std::vector<MatrixXd*> tools::load_all_sigma(const int dim, const std::string& path) {
+    std::vector<MatrixXd*> all (dim*3);
+    /*for (int i = 0, j = 0; i < 3*dim; i+=3, ++j) {
         all[i] = load_sigma(j, "x");
         all[i + 1] = load_sigma(j, "y");
         all[i + 2] = load_sigma(j, "z");
+    }*/
+    for (int i = 0; i < dim; ++i) {
+        all[i] = load_sigma(i, Pauli::X);
+    }
+    for (int i = dim; i < 2*dim; ++i) {
+        all[i] = load_sigma(i, Pauli::Y);
+    }
+    for (int i = 2*dim; i < 3*dim; ++i) {
+        all[i] = load_sigma(i, Pauli::Z);
     }
     return all;
 }
