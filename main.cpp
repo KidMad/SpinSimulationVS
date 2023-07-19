@@ -23,7 +23,7 @@ constexpr char* DATA_OUTPUT_PATH = "E:\\Desktop\\Edu\\University\\3 Anno\\Tesi\\
 int main(){
 
     /**Number of qubits*/
-    int dim = 5;
+    int dim = 7;
     /**Timestep*/
     int tau = 3;
     double dt = 20;
@@ -137,10 +137,10 @@ int main(){
 
     //cout << "Calculated weights" << endl;
 
-    clear_data_folder();
-    exportMatrixToCSV(&measurements, "measurements");
-    exportVectorToCSV(&inputs, "inputs");
-    exportVectorToCSV(&outputs, "outputs");
+    //clear_data_folder();
+    //exportMatrixToCSV(&measurements, "measurements");
+    //exportVectorToCSV(&inputs, "inputs");
+    //exportVectorToCSV(&outputs, "outputs");
 
     
     return 0;
