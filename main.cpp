@@ -1,9 +1,6 @@
 ﻿#include<iostream>
-#include<numeric>
-#include <Eigen/Dense>
 #include <chrono>
 #include <random>
-#include <fstream>
 #include "tools.h"
 
 
@@ -25,7 +22,7 @@ int main(){
     /**Number of qubits*/
     int dim = 5;
     /**Timestep*/
-    int tau = 3;
+    int tau = 1;
     double dt = 20;
 
     /**Number of signal inputs*/
@@ -58,7 +55,8 @@ int main(){
     cout << "Initialized outputs" << endl;
 
     /**Ising hamiltonian initialized with the desired parameters*/
-    auto hamiltonian = ising_hamiltonian(0.1, 1, dim);
+    std::uniform_real_distribution<double>J_dist(-1, 1);
+    auto hamiltonian = ising_hamiltonian(distr(gen), J_dist(gen), dim);
     cout << "Initialized hamiltonian" << endl;
 
     /**Density matrix corresponding to the state where all qubits are in the |0> state*/
@@ -140,10 +138,10 @@ int main(){
 
     //cout << "Calculated weights" << endl;
 
-    //clear_data_folder();
-    //exportMatrixToCSV(&measurements, "measurements");
-    //exportVectorToCSV(&inputs, "inputs");
-    //exportVectorToCSV(&outputs, "outputs");
+    clear_data_folder();
+    exportMatrixToCSV(&measurements, "measurements");
+    exportVectorToCSV(&inputs, "inputs");
+    exportVectorToCSV(&outputs, "outputs");
 
     
     return 0;
