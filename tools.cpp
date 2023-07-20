@@ -276,7 +276,7 @@ void tools::average_single(MatrixXcd* rho, std::vector<MatrixXd*> all, MatrixXd&
     }
     //Y
     for (int i = dim; i < 2*dim; ++i) {
-        output(sample, i) = (complex<double>(0, 1) * *rho * *all[i]).trace().real();
+        output(sample, i) = -(*rho * *all[i]).trace().imag(); // -Im(...) since we are using real sigmaY.
     }
     //Z
     for (int i = 2*dim; i < 3*dim; ++i) {
