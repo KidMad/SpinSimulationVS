@@ -1,13 +1,8 @@
-#include "tools.h"
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <cstdarg>
-#include <random>
-#include <sstream>
+#include "tools.h";
 
 using Eigen::MatrixXcd;
 using Eigen::MatrixXd;
+using Eigen::SparseMatrix;
 using Eigen::VectorXd;
 using Eigen::Matrix;
 using std::complex;
@@ -139,6 +134,72 @@ MatrixXd* tools::sigmaZ(int nth) {
 
     return z_nth;
 }
+
+SparseMatrix<double>* tools::sparseSigmaX(int nth) {
+    int matrix_dim = (int)pow(2, dim);
+    int n_blocks = (int)pow(2, nth + 1);
+    int shift = matrix_dim / n_blocks;
+    SparseMatrix<double>* x_nth = new SparseMatrix<double>(matrix_dim, matrix_dim);
+    x_nth->reserve(1);
+
+    int row = shift;
+    for (int i = 0; i < n_blocks; ++i) {
+        for (int j = i * shift; j < shift * (i + 1); ++j) {
+            x_nth->insert(row, j) = 1;
+            ++row;
+        }
+        if (i % 2 == 0) {
+            row -= 2 * shift;
+        }
+        else {
+            row+= 2 * shift;
+        }
+    }
+    x_nth->makeCompressed();
+
+    return x_nth;
+}
+SparseMatrix<double>* tools::sparseSigmaY(int nth) {
+    int matrix_dim = (int)pow(2, dim);
+    int n_blocks = (int)pow(2, nth + 1);
+    int shift = matrix_dim / n_blocks;
+    SparseMatrix<double>* y_nth = new SparseMatrix<double>(matrix_dim, matrix_dim);
+    y_nth->reserve(1);
+
+    int row = shift;
+    for (int i = 0; i < n_blocks; ++i) {
+        for (int j = i * shift; j < shift * (i + 1); ++j) {
+            y_nth->insert(row, j) = 1 - (i % 2)*2;
+            ++row;
+        }
+        if (i % 2 == 0) {
+            row -= 2 * shift;
+        }
+        else {
+            row += 2 * shift;
+        }
+    }
+    y_nth->makeCompressed();
+
+    return y_nth;
+}
+SparseMatrix<double>* tools::sparseSigmaZ(int nth) {
+    int matrix_dim = (int)pow(2, dim);
+    int n_blocks = (int)pow(2, nth + 1);
+    int shift = matrix_dim / n_blocks;
+    SparseMatrix<double>* z_nth = new SparseMatrix<double>(matrix_dim, matrix_dim);
+    z_nth->reserve(1);
+
+    for (int i = 0; i < n_blocks; ++i) {
+        for (int j = i * shift; j < shift * (i + 1); ++j) {
+            z_nth->insert(j, j) = 1 - (i % 2) * 2;
+        }
+    }
+    z_nth->makeCompressed();
+
+    return z_nth;
+}
+
 void tools::generate_mb_sigma_operators(const std::string& path) {
 
     if (!std::filesystem::exists(path)) {
@@ -254,17 +315,17 @@ std::vector<MatrixXd*> tools::load_all_sigma(const int dim, const std::string& p
     return all;
 }
 
-std::vector<MatrixXd*> tools::generate_all_sigma() {
-    std::vector<MatrixXd*> sigma(dim * 3);
+std::vector<SparseMatrix<double>*> tools::generate_all_sigma() {
+    std::vector<SparseMatrix<double>*> sigma(dim * 3);
     for (int i = 0; i < dim; ++i) {
-        sigma[i] = sigmaX(i);
-        sigma[i + dim] = sigmaY(i);
-        sigma[i + 2*dim] = sigmaZ(i);
+        sigma[i] = sparseSigmaX(i);
+        sigma[i + dim] = sparseSigmaY(i);
+        sigma[i + 2*dim] = sparseSigmaZ(i);
     }
     return sigma;
 }
 
-MatrixXd* tools::ising_hamiltonian(const double H, const double J, const int dim) {
+MatrixXd* tools::ising_hamiltonian(const double H, const double J) {
     auto on_site_parameter = new VectorXd(dim);
     on_site_parameter->setRandom();
 
@@ -272,7 +333,7 @@ MatrixXd* tools::ising_hamiltonian(const double H, const double J, const int dim
     ham_on_site->setZero();
 
     for (int i = 0; i < dim; ++i) {
-        auto sz_i = sigmaZ(i);
+        auto sz_i = sparseSigmaZ(i);
         *ham_on_site += 0.5 * H * (*on_site_parameter)[i] * (*sz_i);
         delete sz_i;
     }
@@ -285,8 +346,8 @@ MatrixXd* tools::ising_hamiltonian(const double H, const double J, const int dim
 
     for (int i = 0; i < dim; ++i) {
         for (int j = i + 1; j < dim; ++j) {
-            auto sx_i = sigmaX(i);
-            auto sx_j = sigmaX(j);
+            auto sx_i = sparseSigmaX(i);
+            auto sx_j = sparseSigmaX(j);
             *ham_interaction += 0.5 * J * (*interaction_coupling)(i, j) * (*sx_i) * (*sx_j);
             delete sx_i;
             delete sx_j;
@@ -366,7 +427,7 @@ void tools::inject_initial_signal(MatrixXcd** rho, VectorXd* signal, MatrixXcd* 
     }
     *rho = rho_ev;
 }
-void tools::average_single(MatrixXcd* rho, std::vector<MatrixXd*> sigma, MatrixXd* output, int sample) {
+void tools::average_single(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample) {
     /*Row -> qubit, Cols -> average of j-th operator**/
     //X
     for (int i = 0; i < dim; ++i) {
@@ -382,7 +443,7 @@ void tools::average_single(MatrixXcd* rho, std::vector<MatrixXd*> sigma, MatrixX
         (*output)(sample, i) = (*rho * *sigma[i]).trace().real();
     }
 }
-void tools::average_double(MatrixXcd* rho, std::vector<MatrixXd*> sigma, MatrixXd* output, int sample) {
+void tools::average_double(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample) {
     int counter = 3*dim;
     for (int i = 0; i < dim; ++i) {
         for (int j = i + 1; j < dim; ++j) {
@@ -393,7 +454,7 @@ void tools::average_double(MatrixXcd* rho, std::vector<MatrixXd*> sigma, MatrixX
         }
     }
 }
-MatrixXd* tools::measure_output(MatrixXcd** rho, std::vector<MatrixXd*> sigma, VectorXd* signal, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d, int tau) {
+MatrixXd* tools::measure_output(MatrixXcd** rho, std::vector<SparseMatrix<double>*> sigma, VectorXd* signal, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d, int tau) {
     /**We are doing 3*dim + 3*(dim-1)*dim/2 measurements per sample i.e. we have 3*dim + 3*(dim-1)*dim/2 columns and M rows*/
     int n_meas = 3 * dim + 3 * dim * (dim - 1) / 2;
     MatrixXd* measurements = new MatrixXd(signal->size() - tau, n_meas);

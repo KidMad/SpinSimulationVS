@@ -1,11 +1,11 @@
 ﻿#include<iostream>
 #include <chrono>
-#include <random>
 #include "tools.h"
-#include <filesystem>
 
 
 using Eigen::MatrixXcd;
+using Eigen::SparseMatrix;
+using Eigen::Triplet;
 using Eigen::VectorXd;
 using Eigen::SelfAdjointEigenSolver;
 using std::cout;
@@ -19,6 +19,7 @@ constexpr char* OPERATORS_PATH = "./operators/";
 constexpr char* DATA_OUTPUT_PATH = "../../../data/";
 
 int main() {
+    auto startTime = std::chrono::high_resolution_clock::now();
 
     /**Number of qubits*/
     constexpr int dim = 5;
@@ -58,7 +59,7 @@ int main() {
     cout << "Generating random Ising hamiltonian...";
     /**Ising hamiltonian initialized with the desired parameters*/
     std::uniform_real_distribution<double>J_dist(-1, 1);
-    auto hamiltonian = ising_hamiltonian(0.1, J_dist(gen), dim);
+    auto hamiltonian = ising_hamiltonian(0.1, J_dist(gen));
     cout << "DONE" << endl;
 
     cout << "Decomposing hamiltonian...";
@@ -93,19 +94,15 @@ int main() {
     delete D;
     delete U_inv;
 
-
     cout << "Generating density matrix...";
     /**Density matrix corresponding to the state where all qubits are in the |0> state*/
     auto rho = new MatrixXcd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
     rho->setZero();
     (*rho)(0, 0) = 1;
     cout << "DONE" << endl;
-
     cout << "Washing out density matrix...";
     wash_out(&rho, M, exp_s, exp_d);
     cout << "DONE" << endl;
-
-    auto startTime = std::chrono::high_resolution_clock::now();
 
     cout << "Generating Pauli operators...";
     auto sigma = generate_all_sigma();
@@ -118,12 +115,6 @@ int main() {
     cout << "Measuring...";
     auto training_measurements = measure_output(&rho, sigma, &inputs, exp_s, exp_d, tau);
     cout << "DONE" << endl;
-
-    //Eigen::JacobiSVD <MatrixXd> svd(measurements, Eigen::ComputeThinU | Eigen::ComputeThinV);
-    //cout << "Generated measurements' matrix SVD" << endl;
-    //VectorXd weights = svd.solve(outputs);
-
-    //cout << "Calculated weights" << endl;
 
     cout << "Exporting training data...";
     clear_data_folder();
@@ -168,13 +159,12 @@ int main() {
     cout << "DONE" << endl;
 
     cout << endl;
+
     auto endTime = std::chrono::high_resolution_clock::now();
     auto duration = endTime - startTime;
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
     auto us = std::chrono::duration_cast<std::chrono::microseconds>(duration);
-
     cout << "Finished. Elapsed time: " << static_cast<double>(us.count()) / 1000.0 << "ms" << endl;
-
 
 
     return 0;
