@@ -39,7 +39,6 @@ int main() {
     std::mt19937_64 gen(rd());
     std::uniform_real_distribution<double> distr(0, 1);
 
-
     cout << "Initializing random input signal sequence...";
     /**Random input vector initialization*/
     VectorXd inputs(M + tau);
@@ -59,7 +58,7 @@ int main() {
     cout << "Generating random Ising hamiltonian...";
     /**Ising hamiltonian initialized with the desired parameters*/
     std::uniform_real_distribution<double>J_dist(-1, 1);
-    auto hamiltonian = ising_hamiltonian(distr(gen), J_dist(gen), dim);
+    auto hamiltonian = ising_hamiltonian(0.1, J_dist(gen), dim);
     cout << "DONE" << endl;
 
     cout << "Decomposing hamiltonian...";

@@ -44,7 +44,6 @@ Matrix<T, Eigen::Dynamic, Eigen::Dynamic>* tools::kronecker_product(const std::i
 
     auto result = new Matrix<T, Eigen::Dynamic, Eigen::Dynamic>(rows_dim, cols_dim);
 
-#pragma omp parallel for default(none) shared(cout, rows_dim, cols_dim, matrices, result)
     for (int i = 0; i < rows_dim; ++i) {
 
         for (int j = 0; j < cols_dim; ++j) {
