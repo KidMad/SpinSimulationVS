@@ -2,6 +2,7 @@
 #include <chrono>
 #include <random>
 #include "tools.h"
+#include <filesystem>
 
 
 using Eigen::MatrixXcd;
@@ -14,8 +15,8 @@ using std::string;
 
 using namespace tools;
 
-constexpr char* OPERATORS_PATH = "../../../operators/";
-constexpr char* DATA_OUTPUT_PATH = "E:\\Desktop\\Edu\\University\\3 Anno\\Tesi\\AnalisiDati\\data\\";
+constexpr char* OPERATORS_PATH = "./operators/";
+constexpr char* DATA_OUTPUT_PATH = "../../../data/";
 
 int main() {
 
@@ -23,7 +24,7 @@ int main() {
     constexpr int dim = 5;
 
     /**Timestep*/
-    int tau = 2;
+    int tau = 3;
     double dt = 20;
 
     /**Number of signal inputs*/
@@ -65,7 +66,6 @@ int main() {
     /**We decompose the hamiltonian to build the time evolution operators through exponentiation*/
     SelfAdjointEigenSolver<MatrixXd> es(*hamiltonian);
 
-
     /**H = U*D*U_inv*/
     /*We are using the order given by the algorithm's solution, it doesn't really matter.**/
     auto U = new MatrixXd(hamiltonian->rows(), hamiltonian->cols());
@@ -80,8 +80,6 @@ int main() {
     *U_inv << U->transpose();
 
     cout << "DONE" << endl;
-
-    cout << endl;
 
     cout << "Generating time evolution operators...";
     /**Time evolution operator exp(-iHdt)*/
@@ -114,11 +112,13 @@ int main() {
     auto sigma = generate_all_sigma();
     cout << "DONE" << endl;
 
+    cout << "Injecting initial signal into system...";
     inject_initial_signal(&rho, &inputs, exp_s, exp_d, tau);
-    
-    auto measurements = measure_output(&rho, sigma, &inputs, exp_s, exp_d, tau);
+    cout << "DONE" << endl;
 
-
+    cout << "Measuring...";
+    auto training_measurements = measure_output(&rho, sigma, &inputs, exp_s, exp_d, tau);
+    cout << "DONE" << endl;
 
     //Eigen::JacobiSVD <MatrixXd> svd(measurements, Eigen::ComputeThinU | Eigen::ComputeThinV);
     //cout << "Generated measurements' matrix SVD" << endl;
@@ -128,7 +128,7 @@ int main() {
 
     cout << "Exporting training data...";
     clear_data_folder();
-    exportMatrixToCSV(measurements, "training_measurements");
+    exportMatrixToCSV(training_measurements, "training_measurements");
     exportVectorToCSV(&inputs, "training_inputs");
     exportVectorToCSV(&outputs, "training_outputs");
     cout << "DONE" << endl;
@@ -157,7 +157,7 @@ int main() {
     inject_initial_signal(&rho, &inputs, exp_s, exp_d, tau);
     cout << "DONE" << endl;
 
-    cout << "Measurin...";
+    cout << "Measuring...";
     auto test_measurements = measure_output(&rho, sigma, &inputs, exp_s, exp_d, tau);
     cout << "DONE" << endl;
 

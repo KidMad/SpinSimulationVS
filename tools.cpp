@@ -359,7 +359,6 @@ MatrixXcd* tools::time_evolution_operator(const double dt, Eigen::DiagonalMatrix
     return op;
 }
 void tools::inject_initial_signal(MatrixXcd** rho, VectorXd* signal, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d, int tau) {
-    cout << "Injecting initial signal into system...";
     MatrixXcd* rho_ev = *rho;
     /*Injecting data*/
     for (int i = 0; i < tau; ++i) {
@@ -367,7 +366,6 @@ void tools::inject_initial_signal(MatrixXcd** rho, VectorXd* signal, MatrixXcd* 
         (*rho_ev) = *time_ev_op_s * *rho_ev * *time_ev_op_d;
     }
     *rho = rho_ev;
-    cout << "DONE" << endl;
 }
 void tools::average_single(MatrixXcd* rho, std::vector<MatrixXd*> sigma, MatrixXd* output, int sample) {
     /*Row -> qubit, Cols -> average of j-th operator**/
@@ -401,7 +399,6 @@ MatrixXd* tools::measure_output(MatrixXcd** rho, std::vector<MatrixXd*> sigma, V
     int n_meas = 3 * dim + 3 * dim * (dim - 1) / 2;
     MatrixXd* measurements = new MatrixXd(signal->size() - tau, n_meas);
 
-    cout << "Measuring...";
     /**Here starts the routine*/
     for (int s = 0; s < signal->size() - tau; ++s) {
         reset(rho, (*signal)[s + tau]);
@@ -410,7 +407,6 @@ MatrixXd* tools::measure_output(MatrixXcd** rho, std::vector<MatrixXd*> sigma, V
         average_single(*rho, sigma, measurements, s);
         average_double(*rho, sigma, measurements, s);
     }
-    cout << "DONE" << endl;
 
     return measurements;
 }
