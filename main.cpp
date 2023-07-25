@@ -25,14 +25,12 @@ constexpr char* DATA_OUTPUT_PATH = "../../../data/";
 
 int main() {
 
-    time_point startTime = high_resolution_clock::now();
-
     /**Number of qubits*/
     constexpr int dim = 5;
 
     /**Timestep*/
-    int tau = 2;
-    double dt = 20;
+    int tau = 0;
+    double dt = 10;
 
     /**Number of signal inputs*/
     constexpr int M = 1000;
@@ -45,95 +43,80 @@ int main() {
     std::mt19937_64 gen(rd());
     std::uniform_real_distribution<double> distr(0, 1);
 
-    cout << "Initializing random input signal sequence...";
-    /**Random input vector initialization*/
-    VectorXd inputs(M + tau);
-    for (int i = 0; i < M + tau; ++i) {
-        inputs[i] = distr(gen);
-    }
-    cout << "DONE" << endl;
-
-
-    cout << "Initializing delayed output sequence from input signal...";
-    VectorXd outputs(M);
-    for (int i = 0; i < M; ++i) {
-        outputs[i] = inputs[i];
-    }
-    cout << "DONE" << endl;
-
-    cout << "Generating random Ising hamiltonian...";
-    MatrixXd* hamiltonian = ising_hamiltonian(&VectorXd(dim).setConstant(1));
-    cout << "DONE" << endl;
-
-    cout << "Generating time evolution operators...";
-    /**Time evolution operator exp(-iHdt)*/
-    MatrixXcd* exp_s = time_evolution_operator(hamiltonian, dt);
-    /**Its inverse (which is just the conjugate transpose)*/
-    MatrixXcd* exp_d = new MatrixXcd(exp_s->rows(), exp_s->cols());
-    *exp_d << exp_s->transpose().conjugate();
-    cout << "DONE" << endl;
-
-    cout << "Generating density matrix...";
-    /**Density matrix corresponding to the state where all qubits are in the |0> state*/
-    MatrixXcd* rho = new MatrixXcd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
-    rho->setZero();
-    (*rho)(0, 0) = 1;
-    cout << "DONE" << endl;
-
-
-    cout << "Washing out density matrix...";
-    wash_out(&rho, M, exp_s, exp_d);
-    cout << "DONE" << endl;
-
-    cout << "Generating Pauli operators...";
+    //clear_data_folder();
     vector<SparseMatrix<double>*> sigma = generate_all_sigma();
-    cout << "DONE" << endl;
+    time_point startTime = high_resolution_clock::now();
 
-    cout << "Measuring...";
-    MatrixXd* training_measurements = measure_output(&rho, sigma, &inputs, exp_s, exp_d, tau);
-    cout << "DONE" << endl;
+#pragma omp parallel for default(none)
+    for (int t = 0; t < 5; ++t) {
+        cout << "Generating " << t << endl;
+    std::ostringstream filename;
+        filename << "run_" << t;
+        for (int i = 0; i < 100; ++i) {
+            /**Random input vector initialization*/
+            VectorXd input(M + t);
+            for (int i = 0; i < M + t; ++i) {
+                input[i] = distr(gen);
+            }
 
-    cout << "Exporting training data...";
-    clear_data_folder();
-    exportMatrixToCSV(training_measurements, "training_measurements");
-    exportVectorToCSV(&inputs, "training_inputs");
-    exportVectorToCSV(&outputs, "training_outputs");
-    cout << "DONE" << endl;
+            VectorXd output(M);
+            for (int i = 0; i < M; ++i) {
+                output[i] = input[i];
+            }
 
-    /*TESTING PHASE*/
+            MatrixXd* hamiltonian = ising_hamiltonian(&VectorXd(dim).setConstant(0.01));
 
-    cout << "Creating test input...";
-    for (int i = 0; i < M + tau; ++i) {
-        inputs[i] = distr(gen);
+            /**Time evolution operator exp(-iHdt)*/
+            MatrixXcd* exp_s = time_evolution_operator(hamiltonian, dt);
+            /**Its inverse (which is just the conjugate transpose)*/
+            MatrixXcd* exp_d = new MatrixXcd(exp_s->rows(), exp_s->cols());
+            *exp_d << exp_s->transpose().conjugate();
+
+            /**Density matrix corresponding to the state where all qubits are in the |0> state*/
+            MatrixXcd* rho = new MatrixXcd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
+            rho->setZero();
+            (*rho)(0, 0) = 1;
+
+            wash_out(&rho, M, exp_s, exp_d);
+
+            MatrixXd* training_measurements = measure_output(&rho, sigma, &input, &output, exp_s, exp_d, t);
+        
+            appendMatrixToCSV(training_measurements, filename.str());
+
+            /*TESTING PHASE*/
+
+            for (int i = 0; i < M + t; ++i) {
+                input[i] = distr(gen);
+            }
+
+            for (int i = 0; i < M; ++i) {
+                output[i] = input[i];
+            }
+
+            wash_out(&rho, M, exp_s, exp_d);
+
+            MatrixXd* test_measurements = measure_output(&rho, sigma, &input, &output, exp_s, exp_d, t);
+
+            appendMatrixToCSV(test_measurements, filename.str());
+        
+            delete training_measurements;
+            delete test_measurements;
+            delete hamiltonian;
+            delete exp_s;
+            delete exp_d;
+            delete rho;
+
+        }
+        cout << endl;
+        filename.str("");
+        filename.clear();
     }
-    cout << "DONE" << endl;
 
-    cout << "Creating output for comparison...";
-    for (int i = 0; i < M; ++i) {
-        outputs[i] = inputs[i];
-    }
-    cout << "DONE" << endl;
-
-    cout << "Washing out density matrix...";
-    wash_out(&rho, M, exp_s, exp_d);
-    cout << "DONE" << endl;
-
-    cout << "Measuring...";
-    MatrixXd* test_measurements = measure_output(&rho, sigma, &inputs, exp_s, exp_d, tau);
-    cout << "DONE" << endl;
-
-    cout << "Exporting testing data...";
-    exportMatrixToCSV(test_measurements, "testing_measurements");
-    exportVectorToCSV(&inputs, "testing_inputs");
-    exportVectorToCSV(&outputs, "testing_outputs");
-    cout << "DONE" << endl;
-
-    cout << endl;
 
     time_point endTime = std::chrono::high_resolution_clock::now();
     nanoseconds duration = endTime - startTime;
     long long ms = duration_cast<milliseconds>(duration).count();
-    cout << "Finished. Elapsed time: " << ms << "ms" << endl;
+    cout << "Elapsed: " << ms << " ms" << endl;
 
 
     return 0;

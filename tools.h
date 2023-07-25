@@ -61,12 +61,14 @@ namespace tools {
     MatrixXcd* time_evolution_operator(MatrixXd* hamiltonian, const double dt);
 
 
-    void average_single(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample);
-    void average_double(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample);
-    MatrixXd* measure_output(MatrixXcd** rho, std::vector<SparseMatrix<double>*> sigma, VectorXd* signal, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d, int tau);
+    void average_single(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample, int colshift=0);
+    void average_double(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample, int colshift = 0);
+    MatrixXd* measure_output(MatrixXcd** rho, std::vector<SparseMatrix<double>*> sigma, VectorXd* input, VectorXd* output, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d, int tau);
 
 
     void clear_data_folder();
     void exportMatrixToCSV(MatrixXd* data, const std::string& filename);
     void exportVectorToCSV(Eigen::VectorXd* data, const std::string& filename);
+
+    void appendMatrixToCSV(MatrixXd* data, const std::string& filename);
 }
