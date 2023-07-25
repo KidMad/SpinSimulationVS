@@ -28,10 +28,6 @@ int main() {
     /**Number of qubits*/
     constexpr int dim = 5;
 
-    /**Timestep*/
-    int tau = 0;
-    double dt = 10;
-
     /**Number of signal inputs*/
     constexpr int M = 1000;
     
@@ -47,69 +43,84 @@ int main() {
     vector<SparseMatrix<double>*> sigma = generate_all_sigma();
     time_point startTime = high_resolution_clock::now();
 
-#pragma omp parallel for default(none)
-    for (int t = 0; t < 5; ++t) {
+    /*Grid specs*/
+    std::pair<double, double> h_range(0.1, 1.0);
+    std::pair<double, double> dt_range(1.0, 10.0);
+    int h_num_samples = 8;
+    int dt_num_samples = 8;
+    double h_step = (h_range.second - h_range.first) / (h_num_samples - 1);
+    double dt_step = (dt_range.second - dt_range.first) / (dt_num_samples - 1);
+
+    for (int t = 5; t < 10; ++t) {
         cout << "Generating " << t << endl;
-    std::ostringstream filename;
-        filename << "run_" << t;
-        for (int i = 0; i < 100; ++i) {
-            /**Random input vector initialization*/
-            VectorXd input(M + t);
-            for (int i = 0; i < M + t; ++i) {
-                input[i] = distr(gen);
+
+        for (double dt_pos = dt_range.first; dt_pos <= dt_range.second; dt_pos += dt_step) {
+
+            #pragma omp parallel for default(none) shared(cout, h_range, dt_range, h_step, dt_step, dt_pos)
+            for (int j = 0; j < h_num_samples; ++j) {
+                cout << "Generating " << dt_pos << "," << h_step*j + h_range.first << endl;
+                std::ostringstream filename;
+                filename << "run_tau" << t << "_" << "dt" << dt_pos << "_" << "h" << h_step*j + h_range.first;
+                
+                for (int i = 0; i < 20; ++i) {
+                    /**Random input vector initialization*/
+                    VectorXd input(M + t);
+                    for (int i = 0; i < M + t; ++i) {
+                        input[i] = distr(gen);
+                    }
+
+                    VectorXd output(M);
+                    for (int i = 0; i < M; ++i) {
+                        output[i] = input[i];
+                    }
+
+                    MatrixXd* hamiltonian = ising_hamiltonian(&VectorXd(dim).setConstant(h_range.first + j*h_step));
+
+                    /**Time evolution operator exp(-iHdt)*/
+                    MatrixXcd* exp_s = time_evolution_operator(hamiltonian, dt_pos);
+                    /**Its inverse (which is just the conjugate transpose)*/
+                    MatrixXcd* exp_d = new MatrixXcd(exp_s->rows(), exp_s->cols());
+                    *exp_d << exp_s->transpose().conjugate();
+
+                    /**Density matrix corresponding to the state where all qubits are in the |0> state*/
+                    MatrixXcd* rho = new MatrixXcd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
+                    rho->setZero();
+                    (*rho)(0, 0) = 1;
+
+                    wash_out(&rho, M, exp_s, exp_d);
+
+                    MatrixXd* training_measurements = measure_output(&rho, sigma, &input, &output, exp_s, exp_d, t);
+
+                    appendMatrixToCSV(training_measurements, filename.str());
+
+                    /*TESTING PHASE*/
+
+                    for (int i = 0; i < M + t; ++i) {
+                        input[i] = distr(gen);
+                    }
+
+                    for (int i = 0; i < M; ++i) {
+                        output[i] = input[i];
+                    }
+
+                    wash_out(&rho, M, exp_s, exp_d);
+
+                    MatrixXd* test_measurements = measure_output(&rho, sigma, &input, &output, exp_s, exp_d, t);
+
+                    appendMatrixToCSV(test_measurements, filename.str());
+
+                    delete training_measurements;
+                    delete test_measurements;
+                    delete hamiltonian;
+                    delete exp_s;
+                    delete exp_d;
+                    delete rho;
+                }
+                filename.str("");
+                filename.clear();
             }
-
-            VectorXd output(M);
-            for (int i = 0; i < M; ++i) {
-                output[i] = input[i];
-            }
-
-            MatrixXd* hamiltonian = ising_hamiltonian(&VectorXd(dim).setConstant(0.01));
-
-            /**Time evolution operator exp(-iHdt)*/
-            MatrixXcd* exp_s = time_evolution_operator(hamiltonian, dt);
-            /**Its inverse (which is just the conjugate transpose)*/
-            MatrixXcd* exp_d = new MatrixXcd(exp_s->rows(), exp_s->cols());
-            *exp_d << exp_s->transpose().conjugate();
-
-            /**Density matrix corresponding to the state where all qubits are in the |0> state*/
-            MatrixXcd* rho = new MatrixXcd(static_cast<long long>(pow(2, dim)), static_cast<long long>(pow(2, dim)));
-            rho->setZero();
-            (*rho)(0, 0) = 1;
-
-            wash_out(&rho, M, exp_s, exp_d);
-
-            MatrixXd* training_measurements = measure_output(&rho, sigma, &input, &output, exp_s, exp_d, t);
-        
-            appendMatrixToCSV(training_measurements, filename.str());
-
-            /*TESTING PHASE*/
-
-            for (int i = 0; i < M + t; ++i) {
-                input[i] = distr(gen);
-            }
-
-            for (int i = 0; i < M; ++i) {
-                output[i] = input[i];
-            }
-
-            wash_out(&rho, M, exp_s, exp_d);
-
-            MatrixXd* test_measurements = measure_output(&rho, sigma, &input, &output, exp_s, exp_d, t);
-
-            appendMatrixToCSV(test_measurements, filename.str());
-        
-            delete training_measurements;
-            delete test_measurements;
-            delete hamiltonian;
-            delete exp_s;
-            delete exp_d;
-            delete rho;
-
         }
-        cout << endl;
-        filename.str("");
-        filename.clear();
+
     }
 
 
