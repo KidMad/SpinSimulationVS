@@ -17,7 +17,7 @@ using Eigen::MatrixXcd;
 using Eigen::SparseMatrix;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
-using Eigen::Matrix;
+using Eigen::MatrixX;
 
 namespace tools {
     extern int dim;
@@ -35,10 +35,10 @@ namespace tools {
     };
 
     template<typename T>
-    Matrix<T, Eigen::Dynamic, Eigen::Dynamic>* kronecker_product(const std::vector<Matrix<T, Eigen::Dynamic, Eigen::Dynamic>>& matrices);
+    MatrixX<T>* kronecker_product(const std::vector<MatrixX<T>>& matrices);
 
     template<typename T>
-    Matrix<T, Eigen::Dynamic, Eigen::Dynamic>* kronecker_product(std::initializer_list<Matrix<T, Eigen::Dynamic, Eigen::Dynamic>*> matrices);
+    MatrixX<T>* kronecker_product(std::initializer_list<MatrixX<T>*> matrices);
 
     /**Pauli matrices*/
     MatrixXd* sigmaX(int nth);
@@ -55,12 +55,12 @@ namespace tools {
     std::vector<SparseMatrix<double>*> generate_all_sigma();
 
 
-    MatrixXd* ising_hamiltonian(double H, double J);
+    MatrixXd* ising_hamiltonian(const VectorXd* h, const double J = 1.0);
     void reset(MatrixXcd** rho, double signal_k);
     void wash_out(MatrixXcd** rho, int input_size, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d);
-    MatrixXcd* time_evolution_operator(const double dt, Eigen::DiagonalMatrix<double, Eigen::Dynamic>* D, MatrixXd* U, MatrixXd* U_inv);
+    MatrixXcd* time_evolution_operator(MatrixXd* hamiltonian, const double dt);
 
-    void inject_initial_signal(MatrixXcd** rho, VectorXd* signal, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d, int tau);
+
     void average_single(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample);
     void average_double(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample);
     MatrixXd* measure_output(MatrixXcd** rho, std::vector<SparseMatrix<double>*> sigma, VectorXd* signal, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d, int tau);
