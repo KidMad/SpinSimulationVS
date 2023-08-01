@@ -46,38 +46,44 @@ int main() {
     /*Grid specs*/
     std::pair<double, double> h_range(0.1, 1.0);
     std::pair<double, double> dt_range(1.0, 10.0);
-    int h_num_samples = 8;
-    int dt_num_samples = 8;
+    int h_num_samples = 32;
+    int dt_num_samples = 32;
     double h_step = (h_range.second - h_range.first) / (h_num_samples - 1);
     double dt_step = (dt_range.second - dt_range.first) / (dt_num_samples - 1);
 
-    for (int t = 5; t < 10; ++t) {
+    int n_samples_mean = 20;
+
+    for (int t = 11; t < 13; ++t) {
         cout << "Generating " << t << endl;
 
-        for (double dt_pos = dt_range.first; dt_pos <= dt_range.second; dt_pos += dt_step) {
+        std::ostringstream filename;
+        filename << "run_tau" << t << "_" << "dt" << dt_range.first << "," << dt_range.second << "(" << dt_num_samples << ")" << "_" << "h" << h_range.first << "," << h_range.second << "(" << h_num_samples << ")";
 
-            #pragma omp parallel for default(none) shared(cout, h_range, dt_range, h_step, dt_step, dt_pos)
-            for (int j = 0; j < h_num_samples; ++j) {
-                cout << "Generating " << dt_pos << "," << h_step*j + h_range.first << endl;
-                std::ostringstream filename;
-                filename << "run_tau" << t << "_" << "dt" << dt_pos << "_" << "h" << h_step*j + h_range.first;
+        MatrixXd sampling(h_num_samples, dt_num_samples);
+
+        for(int i = 0; i < h_num_samples; ++i){
+            #pragma omp parallel for default(none) shared(cout, h_range, dt_range, h_step, dt_step)
+            for (int j = 0; j < dt_num_samples; ++j) {
+                cout << "Generating " << dt_range.first + j * dt_step << "," << h_range.first + i * h_step << endl;
                 
-                for (int i = 0; i < 20; ++i) {
+                VectorXd capacities (n_samples_mean);
+
+                for (int s = 0; s < n_samples_mean; ++s) {
                     /**Random input vector initialization*/
-                    VectorXd input(M + t);
+                    VectorXd training_input(M + t);
                     for (int i = 0; i < M + t; ++i) {
-                        input[i] = distr(gen);
+                        training_input[i] = distr(gen);
                     }
 
-                    VectorXd output(M);
+                    VectorXd training_output(M);
                     for (int i = 0; i < M; ++i) {
-                        output[i] = input[i];
+                        training_output[i] = training_input[i];
                     }
 
-                    MatrixXd* hamiltonian = ising_hamiltonian(&VectorXd(dim).setConstant(h_range.first + j*h_step));
+                    MatrixXd* hamiltonian = ising_hamiltonian(&VectorXd(dim).setConstant(h_range.first + i*h_step));
 
                     /**Time evolution operator exp(-iHdt)*/
-                    MatrixXcd* exp_s = time_evolution_operator(hamiltonian, dt_pos);
+                    MatrixXcd* exp_s = time_evolution_operator(hamiltonian, dt_range.first + j*dt_step);
                     /**Its inverse (which is just the conjugate transpose)*/
                     MatrixXcd* exp_d = new MatrixXcd(exp_s->rows(), exp_s->cols());
                     *exp_d << exp_s->transpose().conjugate();
@@ -89,25 +95,35 @@ int main() {
 
                     wash_out(&rho, M, exp_s, exp_d);
 
-                    MatrixXd* training_measurements = measure_output(&rho, sigma, &input, &output, exp_s, exp_d, t);
-
-                    appendMatrixToCSV(training_measurements, filename.str());
+                    MatrixXd* training_measurements = measure_output(&rho, sigma, &training_input, &training_output, exp_s, exp_d, t);
 
                     /*TESTING PHASE*/
 
+                    VectorXd testing_input(M + t);
                     for (int i = 0; i < M + t; ++i) {
-                        input[i] = distr(gen);
+                        testing_input[i] = distr(gen);
                     }
 
+                    VectorXd testing_output(M);
                     for (int i = 0; i < M; ++i) {
-                        output[i] = input[i];
+                        testing_output[i] = testing_input[i];
                     }
 
                     wash_out(&rho, M, exp_s, exp_d);
 
-                    MatrixXd* test_measurements = measure_output(&rho, sigma, &input, &output, exp_s, exp_d, t);
+                    MatrixXd* test_measurements = measure_output(&rho, sigma, &testing_input, &testing_output, exp_s, exp_d, t);
 
-                    appendMatrixToCSV(test_measurements, filename.str());
+                    /*Calculating weights using training data*/
+                    VectorXd weights = training_measurements->bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(training_output);
+
+                    /*Calculating predicted output using weights from training data and measurements from test data*/
+                    VectorXd predicted_output = (*test_measurements) * weights;
+
+                    double cov = ((predicted_output.array() - predicted_output.mean()) * (testing_output.array() - testing_output.mean())).sum() / (predicted_output.size() - 1);
+                    double pred_var = (predicted_output.array() - predicted_output.mean()).square().sum() / (predicted_output.size() - 1);
+                    double test_var = (testing_output.array() - testing_output.mean()).square().sum() / (testing_output.size() - 1);
+
+                    capacities[s] = (cov * cov) / (pred_var * test_var);
 
                     delete training_measurements;
                     delete test_measurements;
@@ -116,13 +132,15 @@ int main() {
                     delete exp_d;
                     delete rho;
                 }
-                filename.str("");
-                filename.clear();
+
+                sampling(i, j) = capacities.mean();
+
+                //filename.str("");
+                //filename.clear();
             }
         }
-
+        exportMatrixToCSV(&sampling, filename.str());
     }
-
 
     time_point endTime = std::chrono::high_resolution_clock::now();
     nanoseconds duration = endTime - startTime;

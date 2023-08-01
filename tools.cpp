@@ -427,24 +427,24 @@ MatrixXcd* tools::time_evolution_operator(MatrixXd* hamiltonian, const double dt
 
     return exp_s;
 }
-void tools::average_single(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample, int colshift) {
+void tools::average_single(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample) {
     /*Row -> qubit, Cols -> average of j-th operator**/
     //X
     for (int i = 0; i < dim; ++i) {
-        (*output)(sample, i + colshift) = (*rho * *sigma[i]).trace().real();
+        (*output)(sample, i) = (*rho * *sigma[i]).trace().real();
     }
     //Y
     for (int i = dim; i < 2*dim; ++i) {
-        (*output)(sample, i + colshift) = -(*rho * *sigma[i]).trace().imag(); // -Im(...) since we are using real sigmaY.
+        (*output)(sample, i) = -(*rho * *sigma[i]).trace().imag(); // -Im(...) since we are using real sigmaY.
     }
     
     //Z
     for (int i = 2*dim; i < 3*dim; ++i) {
-        (*output)(sample, i + colshift) = (*rho * *sigma[i]).trace().real();
+        (*output)(sample, i) = (*rho * *sigma[i]).trace().real();
     }
 }
-void tools::average_double(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample, int colshift) {
-    int counter = 3*dim + colshift;
+void tools::average_double(MatrixXcd* rho, std::vector<SparseMatrix<double>*> sigma, MatrixXd* output, int sample) {
+    int counter = 3*dim;
     for (int i = 0; i < dim; ++i) {
         for (int j = i + 1; j < dim; ++j) {
             //nb: counter++ first pass the value then increment.
@@ -455,19 +455,18 @@ void tools::average_double(MatrixXcd* rho, std::vector<SparseMatrix<double>*> si
     }
 }
 MatrixXd* tools::measure_output(MatrixXcd** rho, std::vector<SparseMatrix<double>*> sigma, VectorXd* input, VectorXd* output, MatrixXcd* time_ev_op_s, MatrixXcd* time_ev_op_d, int tau) {
-    /*We are doing 3*dim + 3*(dim-1)*dim/2 measurements per sample i.e. we have 3*dim + 3*(dim-1)*dim/2 columns and M rows. We add also 2 columns to store the input (from 0 to size - tau) and the expected output*/
+    /*We are doing 3*dim + 3*(dim-1)*dim/2 measurements per sample i.e. we have 3*dim + 3*(dim-1)*dim/2 columns and M rows. The extra column of 1 is the bias term*/
     int n_meas = 3 * dim + 3 * dim * (dim - 1) / 2;
-    MatrixXd* measurements = new MatrixXd(input->size() - tau, n_meas + 2);
+    MatrixXd* measurements = new MatrixXd(input->size() - tau, n_meas + 1);
 
     /**Here starts the routine*/
     for (int s = 0; s < input->size(); ++s) {
         reset(rho, (*input)[s]);
         **rho = *time_ev_op_s * **rho * *time_ev_op_d;
         if (s >= tau) {
-            (*measurements)(s - tau, 0) = (*input)[s];
-            (*measurements)(s - tau, 1) = (*output)[s - tau];
-            average_single(*rho, sigma, measurements, s - tau, 2);
-            average_double(*rho, sigma, measurements, s - tau, 2);
+            average_single(*rho, sigma, measurements, s - tau);
+            average_double(*rho, sigma, measurements, s - tau);
+            (*measurements)(s - tau, n_meas) = 1;
         }
     }
 
@@ -520,6 +519,10 @@ void tools::exportVectorToCSV(VectorXd* data, const std::string& filename) {
 }
 
 void tools::appendMatrixToCSV(MatrixXd* data, const std::string& filename) {
+    if (!std::filesystem::exists(data_output_path)) {
+        std::filesystem::create_directories(data_output_path);
+    }
+
     std::ofstream file;
 
     file.open(data_output_path + filename + ".csv", std::ios_base::app);
